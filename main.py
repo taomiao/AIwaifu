@@ -19,9 +19,9 @@ from AIVoifu.client_pipeline import tts_pipeline
 vocal_pipeline = tts_pipeline()
 
 # initialize Vstudio Waifu Controller
-print('Initializing... Vtube Studio')
-waifu = Char_control(port=8001, plugin_name='MyBitchIsAI', plugin_developer='HRNPH')
-print('Initialized')
+# print('Initializing... Vtube Studio')
+# waifu = Char_control(port=8001, plugin_name='MyBitchIsAI', plugin_developer='HRNPH')
+# print('Initialized')
 
 
 # chat api
@@ -74,20 +74,20 @@ while True:
         continue # skip audio processing if the answer is just the name (no talking)
 
     # ----------- Waifu Create Talking Audio -----------------------
-    vocal_pipeline.tts(use_answer, save_path=f'./audio_cache/dialog_cache.wav')
-    # --------------------------------------------------
-    
-    # ----------- Waifu Talking -----------------------
-    # play audio directly from cache
-    p = pyaudio.PyAudio()
-    data, samplerate = sf.read('./audio_cache/dialog_cache.wav', dtype='float32')
-    stream = p.open(format=pyaudio.paFloat32,
-                    channels=1,
-                    rate=samplerate,
-                    output=True)
-    stream.write(data.tobytes())
-    stream.stop_stream()
-    stream.close()
+    # vocal_pipeline.tts(use_answer, save_path=f'./audio_cache/dialog_cache.wav')
+    # # --------------------------------------------------
+    #
+    # # ----------- Waifu Talking -----------------------
+    # # play audio directly from cache
+    # p = pyaudio.PyAudio()
+    # data, samplerate = sf.read('./audio_cache/dialog_cache.wav', dtype='float32')
+    # stream = p.open(format=pyaudio.paFloat32,
+    #                 channels=1,
+    #                 rate=samplerate,
+    #                 output=True)
+    # stream.write(data.tobytes())
+    # stream.stop_stream()
+    # stream.close()
 
     # --------------------------------------------------
 
@@ -102,6 +102,6 @@ while True:
         emotion_to_express = 'angry'
 
     print(f'Emotion to express: {emotion_to_express}')
-    if emotion_to_express: ## express emotion
-        waifu.express(emotion_to_express) # express emotion in Vtube Studio
+    # if emotion_to_express: ## express emotion
+    #     waifu.express(emotion_to_express) # express emotion in Vtube Studio
     # --------------------------------------------------

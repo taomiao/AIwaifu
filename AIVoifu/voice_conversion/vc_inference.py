@@ -10,7 +10,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from .Sovits import utils
-from .Sovits.data_utils import UnitAudioLoader, UnitAudioCollate
+# from .Sovits.data_utils import UnitAudioLoader, UnitAudioCollate
 from .Sovits.models import SynthesizerTrn
 from scipy.io.wavfile import write
 from torchaudio.functional import resample

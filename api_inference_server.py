@@ -7,6 +7,8 @@ import romajitable # temporary use this since It'll blow up our ram if we use Ma
 import scipy.io.wavfile as wavfile
 import torch
 import wget 
+from pysentimiento import create_analyzer
+import re
 
 # ---------- Config ----------
 translation = bool(input("Enable translation? (Y/n): ").lower() in ['y', ''])
@@ -31,6 +33,10 @@ print("Loading language model...")
 tokenizer = AutoTokenizer.from_pretrained("PygmalionAI/pygmalion-1.3b", use_fast=True)
 config = AutoConfig.from_pretrained("PygmalionAI/pygmalion-1.3b", is_decoder=True)
 model = AutoModelForCausalLM.from_pretrained("PygmalionAI/pygmalion-1.3b", config=config, )
+senti_analyzer = create_analyzer(task="sentiment", lang="en")
+# tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
+# config = AutoConfig.from_pretrained("bert-base-uncased", is_decoder=True)
+# model = AutoModelForCausalLM.from_pretrained("bert-base-uncased", config=config, )
 
 if use_gpu: # load model to GPU
   model = model.to(device)
@@ -71,18 +77,54 @@ import asyncio
 # use fast api instead
 app = FastAPI()
 
+
+def senti_analyze(text: str) -> list:
+    emotions_text = text
+    if '*' in text:
+        emotions_text = re.findall(r'\*(.*?)\*', emotions_text)  # get emotion *action* as input if exist
+        emotions_text = ' '.join(emotions_text)  # create input
+
+    senti = senti_analyzer.predict(emotions_text)
+    return senti
+
+opt = torch.optim.SGD(model.parameters(), lr=0.0000001)
+loss_fn = torch.nn.L1Loss()
+def train_model_using_user_response(model: torch.nn.Module, model_input, user_response):
+    senti = senti_analyze(user_response)
+    model_output = model(**model_input)
+    # print(f"[debug]: {model_output.logits}")
+    if senti.output == "POS" and senti.probas["POS"] > 0.9:
+        print(f"User Happy")
+        pos = torch.zeros_like(model_output.logits)+senti.probas["POS"]
+        loss = loss_fn(model_output.logits, pos)
+        loss.backward()
+        opt.step()
+    elif senti.output == "NEG" and senti.probas["NEG"] > 0.9:
+        print(f"User not Happy")
+        neg = torch.ones_like(model_output.logits)-senti.probas["NEG"]
+        loss = loss_fn(model_output.logits, neg)
+        loss.backward()
+        opt.step()
+
+
+last_data = None
 # do a http server instead
 @app.get("/waifuapi")
 async def get_waifuapi(command: str, data: str):
+    global last_data
     if command == "chat":
+        if last_data is not None:
+            train_model_using_user_response(model, last_data, data)
         msg = data
         # ----------- Create Response --------------------------
         msg = talk.construct_msg(msg, talk.history_loop_cache) # construct message input and cache History model
+        print(f"[debug msg]: {msg}")
         ## ----------- Will move this to server later -------- (16GB ram needed at least)
         inputs = tokenizer(msg, return_tensors='pt')
         if use_gpu:
             inputs = inputs.to(device)
         out = model.generate(**inputs, max_length=len(inputs['input_ids'][0]) + 100, pad_token_id=tokenizer.eos_token_id)
+        last_data = inputs
         conversation = tokenizer.decode(out[0])
         ## --------------------------------------------------
 
@@ -91,8 +133,11 @@ async def get_waifuapi(command: str, data: str):
         current_converse = talk.get_current_converse(conversation)[:talk.split_counter][talk.split_counter-2:talk.split_counter]
         print(conversation) # only print waifu answer since input already show
         talk.history_loop_cache = '\n'.join(current_converse) # update history for next input message
+        print(f"[debug history_cache]: {talk.history_loop_cache}")
 
         # -------------- use machine translation model to translate to japanese and submit to client --------------
+        if len(current_converse) < 1:
+            current_converse = ["sorry, internal error"]
         cleaned_text = talk.clean_emotion_action_text_for_speech(current_converse[-1]) # clean text for speech
         
         translated = '' # initialize translated text as empty by default
